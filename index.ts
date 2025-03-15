@@ -1,15 +1,14 @@
-const express = require("express");
+import express from "express";
 const io = require("socket.io")(4001, {
 	cors: { origin: "*" },
 });
 const app = express();
+
+app.use(express.json());
 const port = 8080;
 
 app.listen(port, () => {
 	console.log(`Server is running on port ${port}`);
-});
-app.get("/", (req, res) => {
-	res.send("Hello");
 });
 
 io.on("connection", (socket) => {
