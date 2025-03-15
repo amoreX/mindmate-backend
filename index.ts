@@ -34,7 +34,8 @@ io.on("connection", (socket) => {
             socket.to(roomnum).emit("update-users", users[roomnum]);
             callback({ success: true });
         } catch (err) {
-            callback({ success: false });
+            console.error(err);
+            callback({ success: false, error: err.message });
         }
     });
 
