@@ -1,73 +1,74 @@
-
-const io = require("socket.io")(4001, {
-	cors: { origin: "*" },
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: { origin: "*" },
 });
 
+const PORT = process.env.PORT || 4001;
 
-const users: { [key: string]: string[] } = {}; 
+const users: { [key: string]: string[] } = {};
 
 io.on("connection", (socket) => {
-	console.log("user connected");
+    console.log("user connected");
 
+    // client joins a specific room
+    socket.on("join-room", (roomnumber, callback) => {
+        try {
+            const { username, roomnum } = roomnumber;
+            console.log(roomnumber);
+            socket.join(roomnum);
 
-	//client joins a specfic room
-	socket.on("join-room", (roomnumber,callback) => {
-		try{
+            if (!users[roomnum]) {
+                users[roomnum] = [];
+            }
 
-			const {username,roomnum}=roomnumber;
-			console.log(roomnumber);
-			socket.join(roomnum);
+            if (!users[roomnum].includes(username)) {
+                users[roomnum].push(username);
+            }
 
-			if(!users[roomnum]){
-				users[roomnum]=[];
-			}
+            console.log(`${username} joined room ${roomnum}`);
+            io.to(roomnum).emit("update-users", users[roomnum]);
+            socket.to(roomnum).emit("update-users", users[roomnum]);
+            callback({ success: true });
+        } catch (err) {
+            callback({ success: false });
+        }
+    });
 
-			if(!users[roomnum].includes(username)){
-				users[roomnum].push(username);
-			}
+    // client sends message to specific room
+    socket.on("send-message", (roomnumber) => {
+        const { username, message, roomnum } = roomnumber;
+        console.log(`In room ${roomnum}, ${username}: ${message}`);
+        socket.to(roomnum).emit("message", `${username}: ${message}`);
+    });
 
-			console.log(`${username} joined room ${roomnum}`);
-			io.to(roomnum).emit("update-users", users[roomnum]);
-			socket.to(roomnum).emit("update-users",users[roomnum]);
-			callback({success:true});	
-		}catch(err){
-			callback({success:false});
-		}
-		
-	});
+    socket.on("disconnecting", () => {
+        for (const room of socket.rooms) {
+            if (users[room]) {
+                // Find and remove user
+                users[room] = users[room].filter((user) => user !== socket.id);
+                io.to(room).emit("update-users", users[room]);
+                socket.to(room).emit("update-users", users[room]);
+            }
+        }
+    });
 
-	//client sends message to specific room
-	socket.on("send-message",(roomnumber)=>{
-		const {username,message,roomnum}=roomnumber;
-		console.log(`In room ${roomnum},${username}:${message}`)
-		socket.to(roomnum).emit("message",`${username}:${message}`);
-	})
+    socket.on("disconnect", () => {
+        console.log("user-disconnected");
+        for (const room of socket.rooms) {
+            if (users[room]) {
+                // Find and remove user
+                users[room] = users[room].filter((user) => user !== socket.id);
+                io.to(room).emit("update-users", users[room]);
+                socket.to(room).emit("update-users", users[room]);
+            }
+        }
+    });
+});
 
-	socket.on("disconnecting", () => {
-		for (const room of socket.rooms) {
-			if (users[room]) {
-				// Find and remove user
-				users[room] = users[room].filter((user) => user !== socket.id);
-				io.to(room).emit("update-users", users[room]);
-				socket.to(room).emit("update-users", users[room]);
-			}
-		}
-	});
-
-	
-
-	socket.on("disconnect",()=>{
-		console.log("user-disconnected");
-		for (const room of socket.rooms) {
-			if (users[room]) {
-				// Find and remove user
-				users[room] = users[room].filter((user) => user !== socket.id);
-				io.to(room).emit("update-users", users[room]);
-				socket.to(room).emit("update-users", users[room]);
-			}
-		};
-	})
-
-
-
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
